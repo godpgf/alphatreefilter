@@ -26,6 +26,23 @@ def get_alphatree_data(sample_stock_list, day_index_list, stock_all, max_date = 
         leaf_dict_list.append(leaf_dict)
     return leaf_dict_list
 
+def get_current_alphatree_data(cur_stock_list, cur_code_list, stock_all, max_date):
+    #todo
+    stock_all_dict = {}
+    for s in stock_all:
+        stock_all_dict[s[0]] = s
+    leaf_dict_list = list()
+    for i in range(len(cur_stock_list)):
+        leaf_dict = dict()
+        set_stock_dict(leaf_dict, cur_stock_list[i], len(cur_stock_list[i]) - 1, "", max_date)
+        comp_stock = get_compare_stock(cur_stock_list[i], len(cur_stock_list[i]) - 1, stock_all_dict, max_date)
+        set_comp_stock_dict(leaf_dict, comp_stock, 'IndClass.subindustry:')
+        set_comp_stock_dict(leaf_dict, comp_stock, 'IndClass.sector:')
+        set_comp_stock_dict(leaf_dict, comp_stock, 'IndClass.industry:')
+        leaf_dict['code'] = cur_code_list[i]
+        leaf_dict_list.append(leaf_dict)
+    return leaf_dict_list
+
 #读取近期股票数据
 def read_stock_list(cache_path, is_offline, max_date = 260):
     codeProxy = LocalCodeProxy(cache_path, is_offline)
@@ -40,7 +57,16 @@ def read_stock_list(cache_path, is_offline, max_date = 260):
             if len(data) > max_date:
                 codeList.append(code)
                 stockList.append(data)
-    return stockList, dataProxy.get_all_Data('0000001')
+    return stockList, codeList, dataProxy.get_all_Data('0000001')
+
+def filter_current_stock_list(stock_list, code_list, stock_all, max_date = 260):
+    new_stock_list = []
+    new_code_list = []
+    for i in xrange(len(stock_list)):
+        if stock_list[i]['date'][-1] == stock_all['date'][-1] and len(stock_list[i]) >= max_date:
+            new_stock_list.append(stock_list[i])
+            new_code_list.append(code_list[i])
+    return new_stock_list, new_code_list
 
 #def get_eval_score(stock, index, watch_future_size, deposit_rate = 0.8):
 #    score = stock['rise'][index]
