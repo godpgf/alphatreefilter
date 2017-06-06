@@ -2,6 +2,7 @@
 # author=godpgf
 import os
 import pandas as pd
+import numpy as np
 from alphatree import read_alpha_atom_list, read_alpha_tree_list
 from alphatreefilter import *
 
@@ -44,13 +45,19 @@ if __name__ == '__main__':
     hold_day_list = []
     for atree_des in cur_alphatree_list:
         code_list = []
+        alpha_list = []
         atree = atree_des[0]
         score = atree_des[1]
         alpha_min = atree_des[2]
         hold_day_num = atree_des[4]
         for leaf_dict in leaf_dict_list:
-            if atree_des[0].get_alpha(leaf_dict)[-1] > alpha_min:
-                code_list.append(leaf_dict['code'])
+            alpha = atree_des[0].get_alpha(leaf_dict)[-1]
+            if alpha > alpha_min:
+                code_list.append(leaf_dict['code'][0])
+                alpha_list.append(alpha)
+        sort_index = np.argsort(-np.array(alpha_list))
+        code_list = [code_list[index] for index in sort_index]
+
         if len(code_list) > 0:
             stock_list.append(','.join(code_list))
             score_list.append(score)
