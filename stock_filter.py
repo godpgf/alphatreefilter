@@ -3,8 +3,9 @@
 import os
 import pandas as pd
 import numpy as np
-from alphatree import read_alpha_atom_list, read_alpha_tree_list
+from alphatree import read_alpha_atom_list, read_alpha_tree_list, write_alpha_tree_list
 from alphatreefilter import *
+import datetime
 
 if __name__ == '__main__':
     #1、读出所有alphatree
@@ -43,6 +44,7 @@ if __name__ == '__main__':
     stock_list = []
     score_list = []
     hold_day_list = []
+    alpha_tree_list = []
     for atree_des in cur_alphatree_list:
         code_list = []
         alpha_list = []
@@ -51,7 +53,7 @@ if __name__ == '__main__':
         alpha_min = atree_des[2]
         hold_day_num = atree_des[4]
         for leaf_dict in leaf_dict_list:
-            alpha = atree_des[0].get_alpha(leaf_dict)[-1]
+            alpha = atree.get_alpha(leaf_dict)[-1]
             if alpha > alpha_min:
                 code_list.append(leaf_dict['code'][0])
                 alpha_list.append(alpha)
@@ -62,6 +64,7 @@ if __name__ == '__main__':
             stock_list.append(','.join(code_list))
             score_list.append(score)
             hold_day_list.append(hold_day_num)
+            alpha_tree_list.append(atree)
 
     #保存结果
     df = pd.DataFrame({
@@ -70,3 +73,6 @@ if __name__ == '__main__':
         'day':hold_day_list
     })
     df.to_csv('doc/stock_predict.csv', index=False)
+    dt = datetime.datetime.now()
+    dt = '%s%s%s'%(dt.year, dt.month, dt.day)
+    write_alpha_tree_list('doc/alpha_tree_%s.txt'%dt, alpha_tree_list)
