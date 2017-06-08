@@ -1,6 +1,7 @@
 # coding=utf-8
 # author=godpgf
 import numpy as np
+import math
 
 f = open("doc/log.txt", 'w+')
 is_debug = True
@@ -50,19 +51,23 @@ def get_alpha_tree_score(alpha_tree, leaf_dict_list, focus_percent, watch_future
     sort_index = np.argsort(-np.array(alpha_list))
     score = np.zeros(watch_future_size)
 
-    #debug_str = ''
     for i in xrange(watch_length):
         cur_score = leaf_dict_list[sort_index[i]]['score']
         score += cur_score
-
-        #for j in range(len(cur_score)):
-        #    score[j] += cur_score[j]
 
     max_index = 0
     for i in range(1, watch_future_size):
         if score[i] > score[max_index]:
             max_index = i
     score /= watch_length
+
+    max_score = score[max_index]
+    score_stddev = 0
+    for i in xrange(watch_length):
+        delta = leaf_dict_list[sort_index[i]]['score'][max_index] - max_score
+        score_stddev += delta ** 2
+    score_stddev /= watch_length
+    score_stddev = math.sqrt(score_stddev)
 
     if is_debug:
         alpha_list = np.array(alpha_list)
@@ -71,4 +76,4 @@ def get_alpha_tree_score(alpha_tree, leaf_dict_list, focus_percent, watch_future
         print>>f, score[max_index]
         print score[max_index]
 
-    return score[max_index], alpha_list[sort_index[watch_length-1]], alpha_list[sort_index[0]], max_index + 1
+    return max_score, score_stddev, alpha_list[sort_index[watch_length-1]], alpha_list[sort_index[0]], max_index + 1
