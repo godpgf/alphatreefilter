@@ -2,6 +2,7 @@
 #author=godpgf
 #作为alphatree和stock data之间的中介
 from stdb import *
+from stdb.data_reader import date2int
 import numpy as np
 import random
 
@@ -44,16 +45,21 @@ def get_current_alphatree_data(cur_stock_list, cur_code_list, stock_all, max_dat
     return leaf_dict_list
 
 #读取近期股票数据
-def read_stock_list(cache_path, is_offline, max_date = 260):
+def read_stock_list(cache_path, is_offline, max_date = 260, cur_date = None):
     codeProxy = LocalCodeProxy(cache_path, is_offline)
     dataProxy = LocalDataProxy(cache_path, is_offline)
     stockList = list()
     codeList = list()
     codes = codeProxy.get_codes()
+    if cur_date:
+        cur_date = 1000000*date2int(cur_date)
     for code in codes:
         print "code:%s,%d"%(code[0],len(code[0]))
         data = dataProxy.get_all_Data(code[0])
+
         if data is not None:
+            if cur_date:
+                data = data[np.where(data['date'] <= cur_date)]
             if len(data) > max_date:
                 codeList.append(code)
                 stockList.append(data)
@@ -83,7 +89,7 @@ def get_score(stock, index, watch_future_size):
 
 def sample_stock(stock_list, watch_future_size = 5, history_day=160, sample_size=896, max_date = 260):
     day_index_list = list()
-    score_list = list()
+    #score_list = list()
     sample_stock_list = stock_list[:]
     random.shuffle(sample_stock_list)
     sample_stock_list = sample_stock_list[:sample_size]
