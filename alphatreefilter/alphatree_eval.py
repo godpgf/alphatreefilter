@@ -7,7 +7,7 @@ f = open("doc/log.txt", 'w+')
 is_debug = True
 
 class AlphatreeScore(object):
-    def __init__(self, alphatree, score, score_stddev, alpha_min, alpha_max, hold_day_num):
+    def __init__(self, alphatree, score, score_stddev = 0, alpha_min = 0, alpha_max = 0, hold_day_num = 0):
         #选中的alphatree
         self.alphatree = alphatree
         #选中alphatree统计到的得分
@@ -21,45 +21,52 @@ class AlphatreeScore(object):
         #统计到的持有期
         self.hold_day_num = hold_day_num
 
-#精确得到一个alphatree的得分、达到这个得分的alpha范围、持有期
-def get_alpha_tree_score(alpha_tree, leaf_dict_list, focus_percent, watch_future_size):
-    watch_length = int(len(leaf_dict_list) * focus_percent)
-    alpha_list = list()
-
+#精确得到一个alphatree的得分、达到这个得分的alpha范围、持有期（考核alphatree是分级的，某一级得分太低将不能进入下一级，以提高速度）
+def get_alpha_tree_score(alpha_tree, leaf_dict_list, min_scores = [0.01, 0.016, 0.018, 0.02], focus_percents = [0.064, 0.048, 0.032, 0.012], watch_future_size = 5):
     if is_debug:
-        from alphatree.parse.alpha_tree_reader import decode_base_operators,encode_opt_tree
-        print >>f, decode_base_operators(encode_opt_tree(alpha_tree))
+        from alphatree.parse.alpha_tree_reader import decode_base_operators, encode_opt_tree
+        print >> f, decode_base_operators(encode_opt_tree(alpha_tree))
+    for i in range(len(min_scores)):
 
-    for leaf_dict in leaf_dict_list:
-        alpha_list.append(alpha_tree.get_alpha(leaf_dict)[-1])
+        watch_length = int(len(leaf_dict_list[i]) * focus_percents[i])
+        alpha_list = [alpha_tree.get_alpha(leaf_dict)[-1] for leaf_dict in leaf_dict_list[i]]
+        sort_index = np.argsort(-np.array(alpha_list))
+        score = np.zeros(watch_future_size)
 
-    sort_index = np.argsort(-np.array(alpha_list))
-    score = np.zeros(watch_future_size)
+        stock_size = 0
+        for j in xrange(len(sort_index)):
+            if j < watch_length or alpha_list[sort_index[j]] == alpha_list[sort_index[0]]:
+                cur_score = leaf_dict_list[i][sort_index[j]]['score']
+                score += cur_score
+                stock_size += 1
 
-    for i in xrange(watch_length):
-        cur_score = leaf_dict_list[sort_index[i]]['score']
-        score += cur_score
+        max_index = 0
+        for j in range(1, watch_future_size):
+            if score[j] > score[max_index]:
+                max_index = j
+        score /= stock_size
+        max_score = score[max_index]
 
-    max_index = 0
-    for i in range(1, watch_future_size):
-        if score[i] > score[max_index]:
-            max_index = i
-    score /= watch_length
+        if is_debug:
+            alpha_list = np.array(alpha_list)
+            print>>f, alpha_list[sort_index[:stock_size]]
+            #print debug_str
+            print>>f, score[max_index]
+            print "level:%d %.4f (%.4f %.4f) size=%d"%(i, score[max_index],alpha_list[sort_index[stock_size-1]],alpha_list[sort_index[0]],stock_size)
 
-    max_score = score[max_index]
-    score_stddev = 0
-    for i in xrange(watch_length):
-        delta = leaf_dict_list[sort_index[i]]['score'][max_index] - max_score
-        score_stddev += delta ** 2
-    score_stddev /= watch_length
-    score_stddev = math.sqrt(score_stddev)
+        #在某次考核中失败，将终止
+        if max_score < min_scores[i]:
+            return AlphatreeScore(alpha_tree, max_score)
 
-    if is_debug:
-        alpha_list = np.array(alpha_list)
-        print>>f, alpha_list[sort_index[:watch_length]]
-        #print debug_str
-        print>>f, score[max_index]
-        print score[max_index]
 
-    return AlphatreeScore(alpha_tree, max_score, score_stddev, alpha_list[sort_index[watch_length-1]], alpha_list[sort_index[0]], max_index + 1)
-    #return max_score, score_stddev, alpha_list[sort_index[watch_length-1]], alpha_list[sort_index[0]], max_index + 1
+        if i == len(min_scores) -1:
+            #所有考核都成功
+            score_stddev = 0
+            for j in xrange(stock_size):
+                delta = leaf_dict_list[i][sort_index[j]]['score'][max_index] - max_score
+                score_stddev += delta ** 2
+            score_stddev /= stock_size
+            score_stddev = math.sqrt(score_stddev)
+
+            return AlphatreeScore(alpha_tree, max_score, score_stddev, alpha_list[sort_index[stock_size-1]], alpha_list[sort_index[0]], max_index + 1)
+    return None

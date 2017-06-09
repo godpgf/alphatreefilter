@@ -87,7 +87,7 @@ def get_score(stock, index, watch_future_size):
     score = (stock['close'][index + watch_future_size] - cur_price)/cur_price
     return score
 
-def sample_stock(stock_list, watch_future_size = 5, history_day=160, sample_size=896, max_date = 260):
+def sample_stock(stock_list, watch_future_size = 5, history_day=160, sample_size=960, max_date = 260):
     day_index_list = list()
     #score_list = list()
     sample_stock_list = stock_list[:]

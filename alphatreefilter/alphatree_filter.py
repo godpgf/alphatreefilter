@@ -31,14 +31,28 @@ def read_alphatree_from_path(alpha_atom_path, rootdir = "resources/", from_dt = 
             alpha_tree.extend(read_alpha_tree_list(path, alpha_element))
     return alpha_tree
 
-
-def filter_alpha_tree(alpha_tree, stock_list, stock_marker, watch_future_size, history_day, sample_size, max_date, focus_percent, min_filter_score):
+#取样level_size个tree_leaf_list，从小到大排量，以便后面对alphatree做考核
+def level_sample_history_stock(stock_list, stock_marker, watch_future_size = 5, history_day = 160, sample_size = 960, last_history_day = 45, last_sample_size = 1024, max_date = 260, level_size = 4):
     sample_stock_list, day_index_list = sample_stock(stock_list, watch_future_size, history_day, sample_size, max_date)
     leaf_dict_list = get_alphatree_data(sample_stock_list, day_index_list, stock_marker, max_date * 2, watch_future_size)
+    last_sample_stock_list, last_day_index_list = sample_stock(stock_list, watch_future_size, last_history_day, last_sample_size, max_date)
+    last_leaf_dict_list = get_alphatree_data(last_sample_stock_list, last_day_index_list, stock_marker, max_date * 2, watch_future_size)
+    min_sample_size = sample_size / (2 ** (level_size - 1) - 1)
+
+    # 添加各个等级股票数据验证漏斗，特殊处理最后的漏斗数据（最严格，并且重新取样了）
+    leaf_dict_filler = list()
+    for i in range(level_size - 1):
+        leaf_dict_filler.append(
+            leaf_dict_list[max(0, 2 ** i - 1) * min_sample_size:((2 ** (i + 1) - 1) * min_sample_size)])
+    leaf_dict_filler.append(last_leaf_dict_list)
+    return leaf_dict_filler
+
+def filter_alpha_tree(alpha_tree, leaf_dict_list, min_scores = [0.0, 0.01, 0.016, 0.018, 0.02], focus_percents = [0.16, 0.064, 0.048, 0.032, 0.012], watch_future_size = 5):
     alphatree_score_list = []
     for atree in alpha_tree:
-        alphatree_score = get_alpha_tree_score(atree, leaf_dict_list,focus_percent, watch_future_size)
-        if alphatree_score.score > min_filter_score:
+        alphatree_score = get_alpha_tree_score(atree, leaf_dict_list, min_scores, focus_percents, watch_future_size)
+
+        if alphatree_score.score > min_scores[-1]:
             alphatree_score_list.append(alphatree_score)
     return alphatree_score_list
 
@@ -53,7 +67,7 @@ def filter_stock_from_alphatree_score(leaf_dict_list, alphatree_score):
     alpha_list = list()
     for leaf_dict in leaf_dict_list:
         alpha = alphatree_score.alphatree.get_alpha(leaf_dict)[-1]
-        if alpha > alphatree_score.alpha_min:
+        if alpha >= alphatree_score.alpha_min:
             code_list.append(leaf_dict['code'][0])
             alpha_list.append(alpha)
     sort_index = np.argsort(-np.array(alpha_list))
