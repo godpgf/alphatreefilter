@@ -11,7 +11,8 @@ import datetime
 
 if __name__ == '__main__':
     #1、读出所有alphatree
-    alpha_tree = read_alphatree_from_path("doc/alpha_atom.csv", "resources/")
+    #alpha_tree = read_alphatree_from_path("doc/alpha_atom.csv", "resources/")
+    alpha_tree = read_alphatree_from_path("doc/alpha_atom.csv", "test_res/")
 
     #2、读出股票数据
     cache_path = "test"

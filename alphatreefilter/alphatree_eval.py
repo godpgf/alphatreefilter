@@ -35,7 +35,7 @@ def get_alpha_tree_score(alpha_tree, leaf_dict_list, min_scores = [0.01, 0.016, 
 
         stock_size = 0
         for j in xrange(len(sort_index)):
-            if j < watch_length or alpha_list[sort_index[j]] == alpha_list[sort_index[0]]:
+            if j < watch_length or abs(alpha_list[sort_index[j]] - alpha_list[sort_index[0]]) < 0.00001:
                 cur_score = leaf_dict_list[i][sort_index[j]]['score']
                 score += cur_score
                 stock_size += 1
