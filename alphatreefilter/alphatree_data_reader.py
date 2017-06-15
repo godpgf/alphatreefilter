@@ -1,7 +1,7 @@
 #coding=utf-8
 #author=godpgf
 #作为alphatree和stock data之间的中介
-from stdb import *
+
 from stdb.data_reader import date2int
 import numpy as np
 import random
@@ -45,9 +45,7 @@ def get_current_alphatree_data(cur_stock_list, cur_code_list, stock_all, max_dat
     return leaf_dict_list
 
 #读取近期股票数据
-def read_stock_list(cache_path, is_offline, max_date = 260, cur_date = None):
-    codeProxy = LocalCodeProxy(cache_path, is_offline)
-    dataProxy = LocalDataProxy(cache_path, is_offline)
+def read_stock_list(codeProxy, dataProxy, max_date = 260, cur_date = None):
     stockList = list()
     codeList = list()
     codes = codeProxy.get_codes()
@@ -93,16 +91,26 @@ def sample_stock(stock_list, watch_future_size = 5, history_day=160, sample_size
     sample_stock_list = stock_list[:]
     random.shuffle(sample_stock_list)
     sample_stock_list = sample_stock_list[:sample_size]
+    sum_returns = 0
     for i in xrange(len(sample_stock_list)):
         min_index = max(len(sample_stock_list[i]) - history_day - watch_future_size, max_date)
         max_index = len(sample_stock_list[i]) - 1 - watch_future_size
         assert min_index <= max_index and min_index >= max_date and len(sample_stock_list[i]) >= max_date
         index = random.randint(min_index, max_index)
+
         #去掉特殊情况
-        while sample_stock_list[i]['rise'][index] > 0.09:
+        #因为公式目的不是预测市场，而是找到超额收益，所以需要保证标签数据（即sample_stock_list[i]['rise'][index]）的无偏性
+        #当发现数据有偏时就再次取样，保证大体上是无偏的
+        loop_time = 0
+        max_loop_time = 3
+        while (sample_stock_list[i]['rise'][index] > 0.09 or sum_returns * sample_stock_list[i]['rise'][index] > 0) and loop_time < max_loop_time:
             index = random.randint(min_index, max_index)
+            loop_time += 1
+
         day_index_list.append(index)
+        sum_returns += sample_stock_list[i]['rise'][index]
         assert day_index_list[-1] >= max_date
+    #print sum_returns
     #todo 以后加入行业标签
     return sample_stock_list, day_index_list
 

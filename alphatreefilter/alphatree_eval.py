@@ -21,6 +21,9 @@ class AlphatreeScore(object):
         #统计到的持有期
         self.hold_day_num = hold_day_num
 
+        self.codes = list()
+        self.distinct = list()
+
 #精确得到一个alphatree的得分、达到这个得分的alpha范围、持有期（考核alphatree是分级的，某一级得分太低将不能进入下一级，以提高速度）
 def get_alpha_tree_score(alpha_tree, leaf_dict_list, min_scores = [0.01, 0.016, 0.018, 0.02], focus_percents = [0.064, 0.048, 0.032, 0.012], watch_future_size = 5):
     if is_debug:
