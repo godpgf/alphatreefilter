@@ -6,6 +6,7 @@ from alphatree import read_alpha_atom_list, read_alpha_tree_list, write_alpha_tr
 from alphatreefilter import *
 from scipy.stats import pearsonr
 from .alphatree_eval import get_alpha_tree_score
+import math
 
 def get_dt(now):
     year = '%d'%now.year
@@ -66,38 +67,65 @@ def filter_current_stock(stock_list, code_list, stock_market, max_date):
     return get_current_alphatree_data(cur_stock_list, cur_code_list, stock_market, max_date * 2)
 
 
+def get_alphatree_relevance_matrix(leaf_dict_list, alphatree_list, relevance_day = 25):
+    distinct_list = list()
+    relevance_matrix = [[0.0] * len(alphatree_list)] * len(alphatree_list)
+    for alphatree in alphatree_list:
+        distinct = list()
+        for leaf_dict in leaf_dict_list:
+            alpha = alphatree.get_alpha(leaf_dict)
+            distinct.append(alpha[max(len(alpha) - relevance_day, 0):])
+        distinct_list.append(distinct)
+
+    for i in xrange(len(alphatree_list) - 1):
+        for j in xrange(i + 1, len(alphatree_list)):
+            relevance = 0
+            for k in xrange(len(leaf_dict_list)):
+                l = len(distinct_list[i][k])
+                r = len(distinct_list[j][k])
+                min_len = min(l, r)
+                l = distinct_list[i][k][l-min_len:]
+                r = distinct_list[j][k][r - min_len:]
+                r, p = pearsonr(l, r)
+                relevance += 0 if math.isnan(r) else r
+            relevance /= len(leaf_dict_list)
+            relevance_matrix[i][j] = relevance
+            relevance_matrix[j][i] = relevance
+
+    return np.array(relevance_matrix)
+
+
 def filter_alphatree_score(leaf_dict_list, alphatree_score_list, max_relevance = 0.36, relevance_day = 25):
     new_alphatree_score_list = list()
     #通过得出的股票数量过滤alphatree
     for alphatree_score in alphatree_score_list:
         code_list = list()
         alpha_list = list()
-        distinct_list = list()
         for leaf_dict in leaf_dict_list:
             alpha = alphatree_score.alphatree.get_alpha(leaf_dict)
             if alpha[-1] >= alphatree_score.alpha_min:
                 code_list.append(leaf_dict['code'][0])
                 alpha_list.append(alpha[-1])
-            distinct_list.append(alpha[max(len(alpha) - relevance_day, 0):])
         sort_index = np.argsort(-np.array(alpha_list))
         alphatree_score.codes = [code_list[index] for index in sort_index]
-        alphatree_score.distinct = distinct_list
         if len(alphatree_score.codes) > 0:
             new_alphatree_score_list.append(alphatree_score)
 
+    if len(new_alphatree_score_list) == 0:
+        return []
     #通过相关度过滤
     new_alphatree_score_list = sorted(new_alphatree_score_list, key=lambda alphatree_score: alphatree_score.score / alphatree_score.score_stddev)
-    start_index = 0
-    while start_index < len(new_alphatree_score_list) - 1:
-        tmp = [new_alphatree_score_list[i] for i in range(0, start_index+1)]
-        relevance = 0
-        for i in xrange(start_index+1, len(new_alphatree_score_list)):
-            for j in xrange(len(new_alphatree_score_list[start_index].distinct)):
-                r, p = pearsonr(new_alphatree_score_list[start_index].distinct[j], new_alphatree_score_list[i].distinct[j])
-                relevance += r
-            if relevance / len(new_alphatree_score_list) < max_relevance:
-                tmp.append(new_alphatree_score_list[i])
-        new_alphatree_score_list = tmp
-        start_index += 1
-    return new_alphatree_score_list
+    relevance_matrix = get_alphatree_relevance_matrix(leaf_dict_list, [alphatree_score.alphatree for alphatree_score in new_alphatree_score_list], relevance_day)
+
+    choose_index = [0]
+    for i in xrange(1, len(new_alphatree_score_list)):
+        has_relevance_tree = False
+        for index in choose_index:
+            if relevance_matrix[i][index] > max_relevance:
+                has_relevance_tree = True
+                break
+        if has_relevance_tree is False:
+            choose_index.append(i)
+
+    return [new_alphatree_score_list[index] for index in choose_index]
 

@@ -1,7 +1,8 @@
 # coding=utf-8
 # author=godpgf
 from .alphatree_data_reader import read_stock_list
-from .alphatree_filter import level_sample_history_stock, filter_alpha_tree, filter_current_stock, filter_alphatree_score
+from .alphatree_filter import *
+from .sub_alphatree_filter import filter_sub_alphatree
 
 def filter_stock(alpha_tree, codeProxy, dataProxy,
                  max_date = 260, watch_future_size = 5, cur_date = None,
@@ -20,3 +21,12 @@ def filter_stock(alpha_tree, codeProxy, dataProxy,
     alphatree_score_list = filter_alphatree_score(leaf_dict_list, alphatree_score_list)
 
     return alphatree_score_list
+
+#过滤出合成的alpha
+def filter_complex_alpha(alpha_tree, codeProxy, dataProxy, max_date=260, cur_date = None):
+    #取样股票数据
+    stock_list, code_list, stock_market = read_stock_list(codeProxy, dataProxy, max_date, cur_date)
+    sample_stock_list, day_index_list = sample_stock(stock_list, 5, 160, 32, max_date)
+    leaf_dict_list = get_alphatree_data(sample_stock_list, day_index_list, stock_market, max_date * 2, 5)
+    #leaf_dict_list = filter_current_stock(stock_list, code_list, stock_market, max_date)
+    return filter_sub_alphatree(leaf_dict_list, alpha_tree)

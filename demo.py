@@ -14,29 +14,21 @@ if __name__ == '__main__':
 
     #2、得到股票数据接口
     cache_path = "test"
-    is_offline = True
+    is_offline = False
     codeProxy = LocalCodeProxy(cache_path, is_offline)
     dataProxy = LocalDataProxy(cache_path, is_offline)
 
-    #3、过滤股票
+    #3、尝试总结出一些子公式
+    #write_alpha_tree_list('doc/sub_alpha_tree_%s.txt'%get_dt(datetime.datetime.now()), filter_complex_alpha(alpha_tree,codeProxy,dataProxy))
+
+    #4、过滤股票
     alphatree_score_list = filter_stock(alpha_tree, codeProxy, dataProxy)
 
 
-    #4、存档选择的alphatree
+    #5、存档选择的alphatree
     write_alpha_tree_list('doc/alpha_tree_%s.txt'%get_dt(datetime.datetime.now()), [alphatree_score.alphatree for alphatree_score in alphatree_score_list])
 
-    #if len(alphatree_score_list) > 0:
-        #存档选择的stock
-    #    pd.DataFrame({
-    #        'stock': [','.join(codes) for codes in [alphatree_score.codes for alphatree_score in alphatree_score_list]],
-    #        'score': [alphatree_score.score for alphatree_score in alphatree_score_list],
-    #        'sharp': [alphatree_score.score / alphatree_score.score_stddev for alphatree_score in alphatree_score_list],
-    #        'day': [alphatree_score.hold_day_num for alphatree_score in alphatree_score_list],
-    #    }).to_csv('doc/stock_predict_%s.csv'%get_dt(datetime.datetime.now()), index=False)
-    #else:
-    #    print "没有满足条件的alphatree"
-
-    #5、构建投资组合
+    #6、构建投资组合
     max_stock_num = 5
     if len(alphatree_score_list) > 0:
         stock_list = list()
@@ -52,7 +44,7 @@ if __name__ == '__main__':
             weight_list.append(1.0)
         else:
             cur = datetime.datetime.now()
-            dt = "%d-%d-%d"%(cur.year,cur.month,cur.day)
+            dt = pd.Timestamp("%d-%d-%d"%(cur.year,cur.month,cur.day))
             msp = MaxSharpePortfolio()
             for alphatree_score in alphatree_score_list:
                 for code in alphatree_score.codes:
@@ -70,11 +62,11 @@ if __name__ == '__main__':
             weight_list = [weight_list[index] for index in sort_index]
         #存档选择的stock
         pd.DataFrame({
-                'stock': stock_list,
-                'score': score_list,
-                'sharp': sharp_list,
-                'day': day_list,
-                'weight': weight_list,
+                'stock': stock_list[:max_stock_num],
+                'score': score_list[:max_stock_num],
+                'sharp': sharp_list[:max_stock_num],
+                'day': day_list[:max_stock_num],
+                'weight': np.array(weight_list[:max_stock_num])/np.sum(np.array(weight_list[:max_stock_num])),
             }).to_csv('doc/stock_predict_%s.csv'%get_dt(datetime.datetime.now()), index=False)
     else:
         print "没有满足条件的alphatree"
