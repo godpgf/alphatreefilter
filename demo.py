@@ -18,17 +18,14 @@ if __name__ == '__main__':
     codeProxy = LocalCodeProxy(cache_path, is_offline)
     dataProxy = LocalDataProxy(cache_path, is_offline)
 
-    #3、尝试总结出一些子公式
-    #write_alpha_tree_list('doc/sub_alpha_tree_%s.txt'%get_dt(datetime.datetime.now()), filter_complex_alpha(alpha_tree,codeProxy,dataProxy))
-
-    #4、过滤股票
+    #3、过滤股票
     alphatree_score_list = filter_stock(alpha_tree, codeProxy, dataProxy)
 
 
-    #5、存档选择的alphatree
+    #4、存档选择的alphatree
     write_alpha_tree_list('doc/alpha_tree_%s.txt'%get_dt(datetime.datetime.now()), [alphatree_score.alphatree for alphatree_score in alphatree_score_list])
 
-    #6、构建投资组合
+    #5、构建投资组合
     max_stock_num = 5
     if len(alphatree_score_list) > 0:
         stock_list = list()

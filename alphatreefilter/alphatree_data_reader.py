@@ -13,36 +13,41 @@ def get_alphatree_data(sample_stock_list, day_index_list, stock_all, max_date = 
     stock_all_dict = {}
     for s in stock_all:
         stock_all_dict[s[0]] = s
-    #todo
-    leaf_dict_list = list()
-    for i in range(len(sample_stock_list)):
-        leaf_dict = dict()
-        set_stock_dict(leaf_dict, sample_stock_list[i], day_index_list[i], "", max_date)
-        comp_stock = get_compare_stock(sample_stock_list[i], day_index_list[i], stock_all_dict, max_date)
-        set_comp_stock_dict(leaf_dict, comp_stock, 'IndClass.subindustry:')
-        set_comp_stock_dict(leaf_dict, comp_stock, 'IndClass.sector:')
-        set_comp_stock_dict(leaf_dict, comp_stock, 'IndClass.industry:')
-        leaf_dict['score'] = score_list[i]
-        #leaf_dict['real_score'] = real_score_list[i]
-        leaf_dict_list.append(leaf_dict)
-    return leaf_dict_list
+    #todo 加入行业
+    leaf_dict = dict()
+    set_stock_dict(leaf_dict, sample_stock_list, day_index_list, "", max_date)
+    comp_stock_list = get_compare_stock_list(sample_stock_list, day_index_list, stock_all_dict, max_date)
+    comp_day_index_list = [max_date] * len(comp_stock_list)
+    set_stock_dict(leaf_dict, comp_stock_list, comp_day_index_list,'IndClass.subindustry:', max_date)
+    set_stock_dict(leaf_dict, comp_stock_list, comp_day_index_list, 'IndClass.sector:', max_date)
+    set_stock_dict(leaf_dict, comp_stock_list, comp_day_index_list, 'IndClass.industry:', max_date)
+    leaf_dict['score'] = score_list
+
+    return leaf_dict
 
 def get_current_alphatree_data(cur_stock_list, cur_code_list, stock_all, max_date):
     #todo
     stock_all_dict = {}
     for s in stock_all:
         stock_all_dict[s[0]] = s
-    leaf_dict_list = list()
-    for i in range(len(cur_stock_list)):
-        leaf_dict = dict()
-        set_stock_dict(leaf_dict, cur_stock_list[i], len(cur_stock_list[i]) - 1, "", max_date)
-        comp_stock = get_compare_stock(cur_stock_list[i], len(cur_stock_list[i]) - 1, stock_all_dict, max_date)
-        set_comp_stock_dict(leaf_dict, comp_stock, 'IndClass.subindustry:')
-        set_comp_stock_dict(leaf_dict, comp_stock, 'IndClass.sector:')
-        set_comp_stock_dict(leaf_dict, comp_stock, 'IndClass.industry:')
-        leaf_dict['code'] = cur_code_list[i]
-        leaf_dict_list.append(leaf_dict)
-    return leaf_dict_list
+
+    leaf_dict = dict()
+    day_index_list = [len(cur_stock_list[i])-1 for i in xrange(len(cur_code_list))]
+
+    for i in xrange(len(cur_stock_list)):
+        assert cur_stock_list[i]["volume"][-1] != 0
+        if i > 0:
+            assert cur_stock_list[i]["date"][-1] == cur_stock_list[i-1]["date"][-1]
+
+    set_stock_dict(leaf_dict, cur_stock_list, day_index_list, "", max_date)
+    comp_stock_list = get_compare_stock_list(cur_stock_list, day_index_list, stock_all_dict, max_date)
+    comp_day_index_list = [max_date] * len(comp_stock_list)
+    set_stock_dict(leaf_dict, comp_stock_list, comp_day_index_list,'IndClass.subindustry:', max_date)
+    set_stock_dict(leaf_dict, comp_stock_list, comp_day_index_list, 'IndClass.sector:', max_date)
+    set_stock_dict(leaf_dict, comp_stock_list, comp_day_index_list, 'IndClass.industry:', max_date)
+    leaf_dict['code'] = cur_code_list
+    return leaf_dict
+
 
 #读取近期股票数据
 def read_stock_list(codeProxy, dataProxy, max_date = 260, cur_date = None):
@@ -58,7 +63,7 @@ def read_stock_list(codeProxy, dataProxy, max_date = 260, cur_date = None):
         if data is not None:
             if cur_date:
                 data = data[np.where(data['date'] <= cur_date)]
-            if len(data) > max_date:
+            if len(data[np.where(data['volume'] > 0)]) > max_date:
                 codeList.append(code)
                 stockList.append(data)
     return stockList, codeList, dataProxy.get_all_Data('0000001')
@@ -67,7 +72,8 @@ def filter_current_stock_list(stock_list, code_list, stock_all, max_date = 260):
     new_stock_list = []
     new_code_list = []
     for i in xrange(len(stock_list)):
-        if stock_list[i]['date'][-1] == stock_all['date'][-1] and len(stock_list[i]) >= max_date:
+        data = stock_list[i][-max_date-1:]
+        if data['date'][-1] == stock_all['date'][-1] and len(data[np.where(data['volume'] > 0)]) >= max_date * 0.8 and data['volume'][-1] > 0:
             new_stock_list.append(stock_list[i])
             new_code_list.append(code_list[i])
     return new_stock_list, new_code_list
@@ -87,15 +93,37 @@ def get_score(stock, index, watch_future_size):
 
 def sample_stock(stock_list, watch_future_size = 5, history_day=160, sample_size=960, max_date = 260):
     day_index_list = list()
+    sample_stock_list = list()
     #score_list = list()
-    sample_stock_list = stock_list[:]
-    random.shuffle(sample_stock_list)
-    sample_stock_list = sample_stock_list[:sample_size]
+    random_stock_list = stock_list[:]
+    random.shuffle(random_stock_list)
+
+    #sample_stock_list = sample_stock_list[:sample_size]
     sum_returns = 0
-    for i in xrange(len(sample_stock_list)):
-        min_index = max(len(sample_stock_list[i]) - history_day - watch_future_size, max_date)
-        max_index = len(sample_stock_list[i]) - 1 - watch_future_size
-        assert min_index <= max_index and min_index >= max_date and len(sample_stock_list[i]) >= max_date
+    for i in xrange(len(random_stock_list)):
+        min_index = max(len(random_stock_list[i]) - history_day - watch_future_size, max_date)
+        max_index = len(random_stock_list[i]) - 1 - watch_future_size
+        while random_stock_list[i]['volume'][min_index] == 0 or random_stock_list[i]['volume'][max_index] == 0:
+            if random_stock_list[i]['volume'][min_index] == 0:
+                min_index += 1
+            if random_stock_list[i]['volume'][max_index] == 0:
+                max_index -= 1
+            if max_index <= min_index:
+                break
+
+        while min_index < max_index:
+            data = random_stock_list[i][:min_index+1][-max_date-1:]
+            if len(data[np.where(data['volume']==0)]) > 0:
+                #print "min_index++ %d"%len(data[np.where(data['volume']==0)])
+                min_index += 1
+            break
+
+        if max_index <= min_index:
+            #print "too less data ==================================================="
+            #print random_stock_list[i][-history_day-max_date:]
+            continue
+
+        #assert min_index <= max_index and min_index >= max_date and len(sample_stock_list[i]) >= max_date
         index = random.randint(min_index, max_index)
 
         #去掉特殊情况
@@ -103,13 +131,25 @@ def sample_stock(stock_list, watch_future_size = 5, history_day=160, sample_size
         #当发现数据有偏时就再次取样，保证大体上是无偏的
         loop_time = 0
         max_loop_time = 3
-        while (sample_stock_list[i]['rise'][index] > 0.09 or sum_returns * sample_stock_list[i]['rise'][index] > 0) and loop_time < max_loop_time:
+        while (random_stock_list[i]['rise'][index] > 0.09 or sum_returns * random_stock_list[i]['rise'][index] > 0) and loop_time < max_loop_time:
             index = random.randint(min_index, max_index)
             loop_time += 1
 
+        #取样时去掉停盘的数据
+        data = random_stock_list[i][index+1-max_date:index+1]
+        if len(data[np.where(data['volume'] == 0)]) > 0:
+            #print "stop buy day %d"%len(data[np.where(data['volume'] == 0)])
+            #print data[np.where(data['volume'] == 0)]
+            continue
+
         day_index_list.append(index)
-        sum_returns += sample_stock_list[i]['rise'][index]
+        sample_stock_list.append(random_stock_list[i])
+        sum_returns += random_stock_list[i]['rise'][index]
         assert day_index_list[-1] >= max_date
+        if len(day_index_list) == sample_size:
+            break
+
+    assert len(day_index_list) == sample_size
     #print sum_returns
     #todo 以后加入行业标签
     return sample_stock_list, day_index_list
@@ -120,9 +160,8 @@ def sample_stock(stock_list, watch_future_size = 5, history_day=160, sample_size
 def get_score_list(sample_stock_list, day_index_list, watch_future_size = 5):
     return np.array([[get_score(sample_stock_list[i], day_index_list[i], j) for j in range(1, watch_future_size+1)] for i in range(len(sample_stock_list))])
 
-def get_compare_stock(stock, day_index, compare_stock_dict, max_date):
-    start_index = max(day_index - max_date, 0)
-    date = stock["date"][start_index:day_index + 1]
+def get_compare_stock_list(stock_list, day_index_list, compare_stock_dict, max_date):
+    cmp_stock_list = list()
     stocktype = np.dtype([
         ('date', 'uint64'), ('open', 'float64'),
         ('high', 'float64'), ('low', 'float64'),
@@ -130,35 +169,44 @@ def get_compare_stock(stock, day_index, compare_stock_dict, max_date):
         ('vwap', 'float64'), ('rise', 'float64'),
         # ('rf','float64')
     ])
-    bars = np.array([compare_stock_dict[d] for d in date], stocktype)
-    rice_col = bars["rise"]
-    rice_col[0] = 0
-    rice_col[1:] = (bars['close'][1:] - bars['close'][:-1]) / bars['close'][:-1]
-    return bars
+    for i in xrange(len(day_index_list)):
+        day_index = day_index_list[i]
+        start_index = day_index - max_date
+        date = stock_list[i]["date"][start_index:day_index + 1]
+        bars = np.array([compare_stock_dict[d] for d in date], stocktype)
+        rice_col = bars["rise"]
+        rice_col[0] = 0
+        rice_col[1:] = (bars['close'][1:] - bars['close'][:-1]) / bars['close'][:-1]
+        cmp_stock_list.append(bars)
 
-def set_comp_stock_dict(leaf_dict, c_stock, pre_path = ""):
-    leaf_dict["%sopen"%pre_path] = c_stock["open"]
-    leaf_dict["%shigh"%pre_path] = c_stock["high"]
-    leaf_dict["%slow"%pre_path] = c_stock["low"]
-    leaf_dict["%sclose"%pre_path] = c_stock["close"]
-    leaf_dict["%svolume"%pre_path] = c_stock["volume"]
-    leaf_dict["%svwap"%pre_path] = c_stock["vwap"]
-    leaf_dict["%sreturns"%pre_path] = c_stock["rise"]
+    return cmp_stock_list
 
-def set_stock_dict(leaf_dict, stock, day_index, pre_path = "", max_date = 260):
-    start_index = max(day_index - max_date,0)
-    leaf_dict["%sopen"%pre_path] = stock["open"][start_index:day_index + 1]
-    leaf_dict["%shigh"%pre_path] = stock["high"][start_index:day_index + 1]
-    leaf_dict["%slow"%pre_path] = stock["low"][start_index:day_index + 1]
-    leaf_dict["%sclose"%pre_path] = stock["close"][start_index:day_index + 1]
-    leaf_dict["%svolume"%pre_path] = stock["volume"][start_index:day_index + 1]
-    leaf_dict["%svwap"%pre_path] = stock["vwap"][start_index:day_index + 1]
-    leaf_dict["%sreturns"%pre_path] = stock["rise"][start_index:day_index + 1]
-    assert day_index >= 260
-    assert len(leaf_dict["%sopen"%pre_path]) >= 260
-    assert len(leaf_dict["%shigh" % pre_path]) >= 260
-    assert len(leaf_dict["%slow" % pre_path]) >= 260
-    assert len(leaf_dict["%sclose" % pre_path]) >= 260
-    assert len(leaf_dict["%svolume" % pre_path]) >= 260
-    assert len(leaf_dict["%svwap" % pre_path]) >= 260
-    assert len(leaf_dict["%sreturns" % pre_path]) >= 260
+def set_stock_dict(leaf_dict, stock_list, day_index_list, pre_path = "", max_date = 260):
+    #start_index = max(day_index - max_date,0)
+    open_data = list()
+    high_data = list()
+    low_data = list()
+    close_data = list()
+    volume_data = list()
+    vwap_data = list()
+    returns_data = list()
+    for i in xrange(len(day_index_list)):
+        day_index = day_index_list[i]
+        assert day_index >= max_date
+        start_index = day_index - max_date
+        open_data.append(stock_list[i]["open"][start_index:day_index+1])
+        high_data.append(stock_list[i]["high"][start_index:day_index + 1])
+        low_data.append(stock_list[i]["low"][start_index:day_index + 1])
+        close_data.append(stock_list[i]["close"][start_index:day_index + 1])
+        volume_data.append(stock_list[i]["volume"][start_index:day_index + 1])
+        vwap_data.append(stock_list[i]["vwap"][start_index:day_index + 1])
+        returns_data.append(stock_list[i]["rise"][start_index:day_index + 1])
+
+    leaf_dict["%sopen"%pre_path] = np.array(open_data).T
+    leaf_dict["%shigh"%pre_path] = np.array(high_data).T
+    leaf_dict["%slow"%pre_path] = np.array(low_data).T
+    leaf_dict["%sclose"%pre_path] = np.array(close_data).T
+    leaf_dict["%svolume"%pre_path] = np.array(volume_data).T
+    leaf_dict["%svwap"%pre_path] = np.array(vwap_data).T
+    leaf_dict["%sreturns"%pre_path] = np.array(returns_data).T
+

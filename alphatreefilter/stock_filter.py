@@ -17,8 +17,8 @@ def filter_stock(alpha_tree, codeProxy, dataProxy,
     alphatree_score_list = filter_alpha_tree(alpha_tree, leaf_dict_filler, min_scores, focus_percents, watch_future_size)
 
     #得到所有满足要求的stock
-    leaf_dict_list = filter_current_stock(stock_list, code_list, stock_market, max_date)
-    alphatree_score_list = filter_alphatree_score(leaf_dict_list, alphatree_score_list)
+    leaf_dict = filter_current_stock(stock_list, code_list, stock_market, max_date)
+    alphatree_score_list = filter_alphatree_score(leaf_dict, alphatree_score_list)
 
     return alphatree_score_list
 
@@ -27,6 +27,6 @@ def filter_complex_alpha(alpha_tree, codeProxy, dataProxy, max_date=260, cur_dat
     #取样股票数据
     stock_list, code_list, stock_market = read_stock_list(codeProxy, dataProxy, max_date, cur_date)
     sample_stock_list, day_index_list = sample_stock(stock_list, 5, 160, 32, max_date)
-    leaf_dict_list = get_alphatree_data(sample_stock_list, day_index_list, stock_market, max_date * 2, 5)
+    leaf_dict = get_alphatree_data(sample_stock_list, day_index_list, stock_market, max_date, 5)
     #leaf_dict_list = filter_current_stock(stock_list, code_list, stock_market, max_date)
-    return filter_sub_alphatree(leaf_dict_list, alpha_tree)
+    return filter_sub_alphatree(leaf_dict, alpha_tree)

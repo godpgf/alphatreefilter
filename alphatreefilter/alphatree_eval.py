@@ -31,17 +31,19 @@ def get_alpha_tree_score(alpha_tree, leaf_dict_list, min_scores = [0.01, 0.016, 
         print >> f, decode_base_operators(encode_opt_tree(alpha_tree))
     for i in range(len(min_scores)):
 
-        watch_length = int(len(leaf_dict_list[i]) * focus_percents[i])
-        alpha_list = [alpha_tree.get_alpha(leaf_dict)[-1] for leaf_dict in leaf_dict_list[i]]
+        watch_length = int(len(leaf_dict_list[i]['open'][0]) * focus_percents[i])
+        alpha_list = alpha_tree.get_alpha(leaf_dict_list[i])[-1]
         sort_index = np.argsort(-np.array(alpha_list))
         score = np.zeros(watch_future_size)
 
         stock_size = 0
         for j in xrange(len(sort_index)):
             if j < watch_length or abs(alpha_list[sort_index[j]] - alpha_list[sort_index[0]]) < 0.00001:
-                cur_score = leaf_dict_list[i][sort_index[j]]['score']
+                cur_score = leaf_dict_list[i]['score'][sort_index[j]]
                 score += cur_score
                 stock_size += 1
+            else:
+                break
 
         max_index = 0
         for j in range(1, watch_future_size):
@@ -66,7 +68,7 @@ def get_alpha_tree_score(alpha_tree, leaf_dict_list, min_scores = [0.01, 0.016, 
             #所有考核都成功
             score_stddev = 0
             for j in xrange(stock_size):
-                delta = leaf_dict_list[i][sort_index[j]]['score'][max_index] - max_score
+                delta = leaf_dict_list[i]['score'][sort_index[j]][max_index] - max_score
                 score_stddev += delta ** 2
             score_stddev /= stock_size
             score_stddev = math.sqrt(score_stddev)
